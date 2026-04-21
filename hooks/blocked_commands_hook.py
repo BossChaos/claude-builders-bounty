@@ -35,34 +35,64 @@ from pathlib import Path
 
 # Commands that are ALWAYS blocked (no override)
 ALWAYS_BLOCKED_PATTERNS = [
-    r'^rm\s+(-[rf]+\s+)?/\s*$',                    # rm -rf /
-    r'^rm\s+(-[rf]+\s+)?/\*',                      # rm -rf /*
-    r'^rm\s+(-[rf]+\s+)?~\s*$',                    # rm -rf ~
-    r'^dd\s+.*of=/dev/',                           # dd to device
-    r'^:(){ :|:& };:',                              # Fork bomb
-    r'^mkfs\.',                                     # Format disk
-    r'^\s*chmod\s+(-[R]+\s+)?777\s+/',              # chmod 777 /
-    r'^\s*chown\s+(-[R]+\s+)?[^/]+\s+/',            # chown /
+    # rm -rf / variants (covers all flag combinations and spacing)
+    r'^\s*rm\s+(-[rRf]+|--recursive|--force)\s+(/\s*)?$',           # rm -rf /
+    r'^\s*rm\s+(-[rRf]+|--recursive|--force)\s+(/\*)',              # rm -rf /*
+    r'^\s*rm\s+(-[rRf]+|--recursive|--force)\s+(~\s*)$',            # rm -rf ~
+    r'^\s*rm\s+(-[rRf]+\s+){2,}/\s*$',                              # rm -r -f /
+    r'^\s*rm\s+--no-preserve-root',                                 # rm --no-preserve-root
+    r'^\s*sudo\s+rm\s+(-[rRf]+|--recursive|--force)\s+(/\s*)?$',    # sudo rm -rf /
+    r'^\s*sudo\s+rm\s+--no-preserve-root',                          # sudo rm --no-preserve-root
+    # System destruction
+    r'^\s*dd\s+.*of=/dev/',                                         # dd to device
+    r'^\s*:(){\s*:\|:&\s*};:',                                      # Fork bomb
+    r'^\s*mkfs\.',                                                  # Format disk
+    r'^\s*mkfs\.\w+\s+/dev/',                                       # mkfs.ext4 /dev/sda
+    r'^\s*chmod\s+(-[R]+\\s+)?777\s+/',                             # chmod 777 /
+    r'^\s*chmod\s+(-[R]+\\s+)?777\s+~',                             # chmod 777 ~
+    r'^\s*chown\s+(-[R]+\\s+)?[^/]+\s+/',                           # chown /
+    r'^\s*chown\s+(-[R]+\\s+)?[^/]+\s+~',                           # chown ~
+    r'^\s*sudo\s+chmod\s+(-[R]+\\s+)?777',                          # sudo chmod 777
+    r'^\s*sudo\s+chown\s+',                                         # sudo chown
+    # Container/VM escape
+    r'^\s*docker\s+run\s+.*-v\s+/:',                                # docker -v /:/host
+    r'^\s*mount\s+.*--bind\s+/',                                    # mount --bind /
 ]
 
 # Commands that require CONFIRMATION
 REQUIRE_CONFIRMATION_PATTERNS = [
-    r'^rm\s+(-[rf]+\s+)?',                         # rm -rf
-    r'^rmdir\s+',                                   # rmdir
-    r'^git\s+push\s+--force',                      # git push --force
-    r'^git\s+push\s+-f',                           # git push -f
-    r'^DROP\s+TABLE\s+',                           # SQL DROP TABLE
-    r'^drop\s+table\s+',                           # SQL drop table (lowercase)
-    r'^TRUNCATE\s+',                               # SQL TRUNCATE
-    r'^truncate\s+',                               # SQL truncate (lowercase)
-    r'^DELETE\s+FROM\s+',                          # SQL DELETE FROM
-    r'^delete\s+from\s+',                          # SQL delete from (lowercase)
-    r'^UPDATE\s+.*SET\s+.*WHERE\s+1\s*=\s*1',      # Dangerous UPDATE
-    r'^\s*sudo\s+rm\s+',                           # sudo rm
-    r'^\s*sudo\s+chmod\s+',                        # sudo chmod
-    r'^\s*sudo\s+chown\s+',                        # sudo chown
-    r'^\s*curl\s+.*\|\s*(ba)?sh',                  # curl | bash
-    r'^\s*wget\s+.*\|\s*(ba)?sh',                  # wget | bash
+    # File deletion (non-root paths)
+    r'^\s*rm\s+(-[rRf]+\s+)+',                                      # rm -rf
+    r'^\s*rm\s+(-[rRf]+\s+)+\.[^/]',                                # rm -rf ./something
+    r'^\s*rmdir\s+',                                                 # rmdir
+    # Git destructive operations
+    r'^\s*git\s+push\s+--force',                                    # git push --force
+    r'^\s*git\s+push\s+-f',                                         # git push -f
+    r'^\s*git\s+reset\s+--hard\s+HEAD',                             # git reset --hard
+    r'^\s*git\s+clean\s+-[fdx]+',                                   # git clean -fdx
+    # SQL destructive operations
+    r'^\s*DROP\s+TABLE\s+',                                         # SQL DROP TABLE
+    r'^\s*drop\s+table\s+',                                         # SQL drop table (lowercase)
+    r'^\s*TRUNCATE\s+',                                             # SQL TRUNCATE
+    r'^\s*truncate\s+',                                             # SQL truncate (lowercase)
+    r'^\s*DELETE\s+FROM\s+',                                        # SQL DELETE FROM
+    r'^\s*delete\s+from\s+',                                        # SQL delete from (lowercase)
+    r'^\s*UPDATE\s+.*SET\s+.*WHERE\s+1\s*=\s*1',                    # Dangerous UPDATE
+    r'^\s*ALTER\s+TABLE\s+.*DROP\s+COLUMN',                         # ALTER TABLE DROP COLUMN
+    # Sudo commands (require extra caution)
+    r'^\s*sudo\s+rm\s+',                                            # sudo rm
+    r'^\s*sudo\s+chmod\s+',                                         # sudo chmod
+    r'^\s*sudo\s+chown\s+',                                         # sudo chown
+    r'^\s*sudo\s+su\b',                                            # sudo su
+    r'^\s*sudo\s+-i\b',                                             # sudo -i (root shell)
+    # Remote code execution risks
+    r'^\s*curl\s+.*\|\s*(ba)?sh',                                   # curl | bash
+    r'^\s*curl\s+.*\|\s*sudo',                                      # curl | sudo
+    r'^\s*wget\s+.*\|\s*(ba)?sh',                                   # wget | bash
+    r'^\s*wget\s+.*\|\s*sudo',                                      # wget | sudo
+    # Environment manipulation
+    r'^\s*export\s+PATH\s*=',                                       # export PATH=
+    r'^\s*unset\s+PATH',                                            # unset PATH
 ]
 
 # Log file location

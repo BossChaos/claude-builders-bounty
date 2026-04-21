@@ -59,26 +59,42 @@ ls -la ~/.claude/hooks/blocked.log
 | Command | Reason |
 |---------|--------|
 | `rm -rf /` | Deletes root filesystem |
+| `rm -r -f /` | Deletes root filesystem (split flags) |
 | `rm -rf /*` | Deletes all files |
 | `rm -rf ~` | Deletes home directory |
+| `sudo rm -rf /` | Root-level filesystem delete |
+| `rm --no-preserve-root` | Bypasses rm safety check |
 | `dd of=/dev/*` | Overwrites disk |
 | `:(){ :|:& };:` | Fork bomb |
 | `mkfs.*` | Formats disk |
 | `chmod 777 /` | Dangerous permissions |
 | `chown * /` | Changes root ownership |
+| `sudo chmod 777` | Root-level dangerous permissions |
+| `docker run -v /:/host` | Container escape |
+| `mount --bind /` | Mount namespace escape |
 
 ### Requires Confirmation
 
 | Command | Reason |
 |---------|--------|
 | `rm -rf *` | Recursive delete |
+| `rm -rf ./folder` | Recursive delete (relative path) |
 | `git push --force` | Rewrites history |
+| `git push -f` | Rewrites history (short form) |
+| `git reset --hard HEAD` | Discards all changes |
+| `git clean -fdx` | Removes untracked files |
 | `DROP TABLE *` | Deletes database table |
 | `TRUNCATE *` | Empties table |
 | `DELETE FROM *` | Deletes rows |
+| `ALTER TABLE DROP COLUMN` | Removes column |
 | `sudo rm *` | Root-level delete |
+| `sudo su` | Switch to root |
+| `sudo -i` | Root shell |
 | `curl * | bash` | Remote code execution |
+| `curl * | sudo` | Remote code execution as root |
 | `wget * | bash` | Remote code execution |
+| `export PATH=` | Modifies system path |
+| `unset PATH` | Breaks command resolution |
 
 ## Usage Examples
 
