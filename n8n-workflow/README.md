@@ -56,6 +56,7 @@ In n8n workflow settings, add these environment variables:
 | `GITHUB_REPO_OWNER` | GitHub username/org | `claude-builders-bounty` |
 | `GITHUB_REPO_NAME` | Repository name | `claude-builders-bounty` |
 | `DISCORD_WEBHOOK_URL` | Discord channel webhook | `https://discord.com/api/webhooks/...` |
+| `CLAUDE_MODEL` | *(Optional)* Claude model version | `claude-sonnet-4-20250514` |
 
 **To get Discord webhook:**
 1. Open Discord channel settings
@@ -69,6 +70,54 @@ In n8n workflow settings, add these environment variables:
 2. Click **Execute Workflow** to test immediately
 3. Check Discord for the summary message
 4. Verify schedule: Next run shows Friday 5pm
+
+## Testing & Verification
+
+Before deploying to production, validate the workflow:
+
+### Option 1: n8n CLI Validation
+```bash
+# Import and validate workflow structure
+n8n import:workflow --input=n8n-workflow/workflow.json --check
+```
+
+### Option 2: JSON Schema Validation
+```bash
+# Install AJV CLI
+npm install -g ajv-cli
+
+# Validate against n8n workflow schema
+ajv validate -s n8n-workflow-schema.json -d n8n-workflow/workflow.json
+```
+
+### Option 3: Manual Test Run
+1. In n8n, click **Execute Workflow** button
+2. Verify all 3 GitHub API calls return data
+3. Check Claude node produces formatted summary
+4. Confirm Discord receives the message
+
+## Security Notes
+
+### GitHub Token Permissions
+⚠️ **Principle of Least Privilege**: This workflow only **reads** GitHub data. Consider using minimal scopes:
+
+| Scope | Current | Recommended | Why |
+|-------|---------|-------------|-----|
+| `repo` | ✅ Used | ⚠️ Overprivileged | Full read/write access |
+| `public_repo` | - | ✅ Better | Read-only for public repos |
+| `repo:status` | - | ✅ Better | Read commit status only |
+
+**To create a minimal token:**
+1. Go to https://github.com/settings/tokens
+2. Select **Only select scopes**
+3. Enable **`repo:status`** (read-only commit status)
+4. For private repos: add **`repo`** (read-only, no write needed)
+
+### Discord Webhook Security
+⚠️ **Never commit webhook URLs to version control:**
+- Webhook URLs are like passwords — anyone with the URL can post to your channel
+- The `DISCORD_WEBHOOK_URL` environment variable is **not** stored in `workflow.json`
+- If webhook is leaked, delete it in Discord and create a new one
 
 ## Output Example
 
@@ -128,8 +177,10 @@ Edit the **Schedule Trigger** node:
 - `minutes`: 0-59
 
 ### Change Claude model
-Edit the **Generate Summary with Claude** node:
-- Update `model` parameter (e.g., `claude-3-5-sonnet-20241022`)
+
+Edit the environment variables in workflow settings:
+- Add `CLAUDE_MODEL` with your preferred version (e.g., `claude-3-5-sonnet-20241022`)
+- Or leave empty to use default (`claude-sonnet-4-20250514`)
 
 ### Custom summary prompt
 Edit the `messages` parameter in Claude node to change the summary style.
