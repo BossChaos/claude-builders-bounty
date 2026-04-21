@@ -438,6 +438,112 @@ export function getDb() {
 - Add `loading.tsx` for streaming UI
 - Use `next/image` for optimized images
 
+## Security Best Practices
+
+### SQL Injection Prevention
+```typescript
+// ✅ Use parameterized queries with Drizzle
+const user = await db.query.users.findFirst({
+  where: eq(users.email, email), // Safe
+});
+
+// ❌ Never concatenate user input
+const user = await db.execute(`SELECT * FROM users WHERE email = '${email}'`);
+```
+
+### XSS Prevention
+```typescript
+// ✅ React automatically escapes content
+<div>{userInput}</div>
+
+// ❌ Never use dangerouslySetInnerHTML with user content
+<div dangerouslySetInnerHTML={{ __html: userInput }} />
+
+// ✅ If you must, sanitize first
+import DOMPurify from 'dompurify';
+<div dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(userInput) }} />
+```
+
+### CSRF Protection
+- NextAuth.js includes CSRF protection by default
+- For custom forms, use CSRF tokens:
+```typescript
+import { getCsrfToken } from 'next-auth/react';
+
+export default async function Page() {
+  const csrfToken = await getCsrfToken();
+  return <input name="csrfToken" type="hidden" defaultValue={csrfToken} />;
+}
+```
+
+### Rate Limiting
+```typescript
+import { Ratelimit } from '@upstash/ratelimit';
+
+const ratelimit = new Ratelimit({
+  redis: Redis.fromEnv(),
+  limiter: Ratelimit.slidingWindow(10, '10 s'),
+});
+
+export async function POST(request: Request) {
+  const ip = request.headers.get('x-forwarded-for');
+  const { success } = await ratelimit.limit(ip ?? 'anonymous');
+  
+  if (!success) {
+    return NextResponse.json({ error: 'Too many requests' }, { status: 429 });
+  }
+  // ...
+}
+```
+
+## Accessibility (a11y) Guidelines
+
+### Component Requirements
+- All interactive elements must have `aria-label` or visible text
+- Images must have `alt` text (decorative images use `alt=""`)
+- Forms must have associated `<label>` elements
+- Color alone cannot convey information
+- Focus states must be visible
+
+### Testing
+```bash
+# Run axe-core accessibility tests
+npm run test:a11y
+
+# Lighthouse CI for accessibility score
+npm run lighthouse
+```
+
+## Git Workflow
+
+### Branch Naming
+- `feat/feature-name` - New features
+- `fix/bug-name` - Bug fixes
+- `chore/task-name` - Maintenance tasks
+- `docs/doc-name` - Documentation updates
+
+### Commit Message Format
+```
+type(scope): subject
+
+body (optional)
+
+footer (optional) - Closes #123
+```
+
+Types: `feat`, `fix`, `chore`, `docs`, `style`, `refactor`, `test`, `ci`
+
+Example:
+```
+feat(auth): add password reset flow
+
+- Add forgot password form
+- Add reset token generation
+- Send email with reset link
+
+Closes #45
+```
+
 ---
 
 **Last Updated**: 2026-04-21  
